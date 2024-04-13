@@ -1,0 +1,8 @@
+while wait(10) do
+local args = {
+    [1] = "Button",
+    [2] = workspace:WaitForChild("Tycoons"):WaitForChild("Dark Green"):WaitForChild("Buttons"):WaitForChild("Dropper1"):WaitForChild("Button")
+}
+
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FireButton"):FireServer(unpack(args))
+end
