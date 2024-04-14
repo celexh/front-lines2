@@ -1,6 +1,7 @@
+while wait(3) do
 local args = {
     [1] = "Rebirth"
 }
 
 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("FireButton"):FireServer(unpack(args))
-
+end
