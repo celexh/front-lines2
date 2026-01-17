@@ -1,1 +1,35 @@
-0
+local serverUrl = "https://alive-server--ewassreddd.replit.app/alive"
+local player = game.Players.LocalPlayer
+if not player then
+    warn("LocalPlayer not found!")
+    return
+end
+
+-- Wait a bit for character to load
+wait(1)
+
+local userId = player.UserId or 0
+local username = player.Name or "Unknown"
+local executor = identifyexecutor and identifyexecutor() or "Unknown"
+
+print("Player: " .. username)
+print("UserID: " .. tostring(userId))
+print("Executor: " .. executor)
+
+
+local params = "?userId=" .. tostring(userId) .. 
+               "&username=" .. username .. 
+               "&executor=" .. executor
+
+local fullUrl = serverUrl .. params
+
+
+local success, response = pcall(function()
+    return game:HttpGet(fullUrl)
+end)
+
+if success then
+    print("SUCCESS Server responded: " .. response)
+else
+    print("✗ Failed: " .. tostring(response))
+end
