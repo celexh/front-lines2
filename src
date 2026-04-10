@@ -3754,7 +3754,6 @@ function UI:StartAutoQuest()
                                             -- Parse requirement
                                             local requirement = self:ParseQuestRequirement(taskText)
                                             if requirement then
-                                                -- Check if kill_mob requirement has a configured spawner
                                                 if requirement.type == "kill_mob" then
                                                     local spawnerInfo = self:GetMobSpawnerCooldown(requirement.mob)
                                                     
@@ -4550,806 +4549,789 @@ function UI:StartAutoFarm()
                             end
                         end)
 
-            local success, err = pcall(function()
-                local player = game.Players.LocalPlayer
-                local character = player.Character
-                
-                if not character then
-                    print("No character, waiting...")
-                    wait(1)
-                    return
-                end
-                
-                local hrp = character:FindFirstChild("HumanoidRootPart")
-                if not hrp then
-                    print("No HRP, waiting...")
-                    wait(1)
-                    return
-                end
-                
-                local coreStats = player:FindFirstChild("CoreStats")
-                local gatherTimeSeconds = self.gatherTime * 60
-                local timeElapsed = os.clock() - (self.gatherStartTime or os.clock())
-                local gatherTimeFull = timeElapsed >= gatherTimeSeconds
-                if not self.lastTimerDebug or os.clock() - self.lastTimerDebug >= 10 then
-                    self.lastTimerDebug = os.clock()
-                end
-                if coreStats then
-                    local pollen = coreStats:FindFirstChild("Pollen")
-                    local capacity = coreStats:FindFirstChild("Capacity")
-                    if pollen and capacity then
-                        local pollenValue = pollen.Value
-                        local capacityValue = capacity.Value 
-                        if pollenValue >= capacityValue or gatherTimeFull then
-                            if not fullPollenTime then
-                                fullPollenTime = os.clock() - 2
-                            else
-                                local elapsed = os.clock() - fullPollenTime
-                            end
-                            
-                            if fullPollenTime and os.clock() - fullPollenTime >= 2 and not returningToHive then
-                                    returningToHive = true
-                                    self.returningFromConversion = true
-                                    
-                                    if self.useInstantConverter and self.autoFarmEnabled then
-                                        local currentTime = os.clock()
-                                        
-                                        if not self.lastInstantConverter1Time then self.lastInstantConverter1Time = currentTime - 900 end
-                                        if not self.lastInstantConverter2Time then self.lastInstantConverter2Time = currentTime - 900 end
-                                        if not self.lastInstantConverter3Time then self.lastInstantConverter3Time = currentTime - 900 end
-                                        
-                                        local closestConverter = nil
-                                        local closestDistance = math.huge
-                                        local converterKey = nil
-                                        
-                                        if currentTime - self.lastInstantConverter1Time >= 900 then
-                                            local dx = hrp.Position.X - (-147)
-                                            local dz = hrp.Position.Z - 193
-                                            local distance = math.sqrt(dx * dx + dz * dz)
-                                            if distance < closestDistance then
-                                                closestDistance = distance
-                                                closestConverter = "IC1"
-                                                converterKey = "instantConverter1"
-                                            end
-                                        end
-                                        
-                                        if currentTime - self.lastInstantConverter2Time >= 900 then
-                                            local dx = hrp.Position.X - 282
-                                            local dz = hrp.Position.Z - (-63)
-                                            local distance = math.sqrt(dx * dx + dz * dz)
-                                            if distance < closestDistance then
-                                                closestDistance = distance
-                                                closestConverter = "IC2"
-                                                converterKey = "instantConverter2"
-                                            end
-                                        end
-                                        
-                                        if currentTime - self.lastInstantConverter3Time >= 900 then
-                                            local dx = hrp.Position.X - 143
-                                            local dz = hrp.Position.Z - (-222)
-                                            local distance = math.sqrt(dx * dx + dz * dz)
-                                            if distance < closestDistance then
-                                                closestDistance = distance
-                                                closestConverter = "IC3"
-                                                converterKey = "instantConverter3"
-                                            end
-                                        end
-                                        
-                                        if converterKey then
-                                            print(closestConverter .. " AVAILABLE")
-                                            
-                                            -- Use the dispenser collection function
-                                            self:CollectDispenser(converterKey)
-                                            
-                                            if closestConverter == "IC1" then
-                                                self.lastInstantConverter1Time = currentTime
-                                            elseif closestConverter == "IC2" then
-                                                self.lastInstantConverter2Time = currentTime
-                                            elseif closestConverter == "IC3" then
-                                                self.lastInstantConverter3Time = currentTime
-                                            end
-                                            
-                                            returningToHive = false
-                                            fullPollenTime = nil
-                                            self.gatherStartTime = os.clock()
-                                            self.status = "Auto Farm Active"
-                                            
-                                            wait(1)
-                                            return
-                                        end
-                                    end
-                                    
-                                    if self.resetWhenFull then
-                                        self.status = "Resetting (Full)"
-                                        self.needsRedraw = true
-                                        
-                                        StopWalking()
-                                        self:ClearTweenQueue()
-                                        ResetPlayer()
-                                        local respawned = WaitForRespawn(30)
-                                        
-                                        if respawned then
-                                            self.status = "Waiting for bees..."
-                                            self.needsRedraw = true
-                                            wait(15)
-                                            returningToHive = false
-                                            fullPollenTime = nil
-                                            self.sprinklersPlaced = false
-                                            self.status = "Auto Farm Active"
-                                            self.needsRedraw = true
-                                            
-                                            local player = game.Players.LocalPlayer
-                                            local character = player.Character
-                                            if character then
-                                                local hrp = character:FindFirstChild("HumanoidRootPart")
-                                                if hrp then
-                                                    local flowerZones = game.Workspace.FlowerZones
-                                                    if flowerZones and self.selectedOption then
-                                                        local targetZone = flowerZones:FindFirstChild(self.selectedOption)
-                                                        if targetZone then
-                                                            local targetPos = Vector3.new(targetZone.Position.X, targetZone.Position.Y + 10, targetZone.Position.Z)
-                                                            self:QueueTween(hrp, targetPos, true)
-                                                            wait(1)
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        else
-                                            print("ERROR: Failed to respawn, stopping auto farm")
-                                            self:StopAutoFarm()
-                                            return
-                                        end
-                                    else
-                                        self.status = "Going to Hive"
-                                        self.needsRedraw = true
-
-                                        StopWalking()
-                                        self:ClearTweenQueue()
-                                            local hivePlatforms = game.Workspace:FindFirstChild("HivePlatforms")
-
-                                            if hivePlatforms then
-                                                local playerHive = nil
-                                                
-                                                for _, platform in pairs(hivePlatforms:GetChildren()) do
-                                                    local playerRef = platform:FindFirstChild("PlayerRef")
-                                                    if playerRef and playerRef.Value then
-                                                        local refPlayer = playerRef.Value
-                                                        
-                                                        if refPlayer.Name == player.Name then
-                                                            playerHive = platform
-                                                            break
-                                                        end
-                                                    end
-                                                end
-                                                
-                                                if playerHive then
-                                                    local hivePart = playerHive:FindFirstChild("Platform") or playerHive:FindFirstChildWhichIsA("BasePart")
-                                                    
-                                                    if hivePart then
-                                                        local hivePos = Vector3.new(hivePart.Position.X, hivePart.Position.Y + 5, hivePart.Position.Z)
-                                                        
-                                                        if self.testWalkEnabled and self.selectedOption and self.selectedOption ~= "Select Field..." then
-                                                            local currentFieldHub = self.fieldToHub[self.selectedOption]
-                                                            if currentFieldHub then
-                                                                local pathToSpawn = self:PathfindBetweenNodes(currentFieldHub, "dand_mush_w2")
-                                                                if pathToSpawn then
-                                                                    local walkSuccess = self:WalkPath(pathToSpawn)
-                                                                    
-                                                                    if walkSuccess then
-                                                                        print("at spawn")
-                                                                    else
-                                                                        print("Pathfind failed, tweening to spawn")
-                                                                        self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
-                                                                        local tweenStart = os.clock()
-                                                                        while self.processingTween and self.autoFarmEnabled do
-                                                                            if checkAndHandleDeath() then break end
-                                                                            if os.clock() - tweenStart > 60 then
-                                                                                self:ClearTweenQueue()
-                                                                                break
-                                                                            end
-                                                                            wait(0.1)
-                                                                        end
-                                                                    end
-                                                                else
-                                                                    print("No path to spawn tweening")
-                                                                    self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
-                                                                    local tweenStart = os.clock()
-                                                                    while self.processingTween and self.autoFarmEnabled do
-                                                                        if checkAndHandleDeath() then break end
-                                                                        if os.clock() - tweenStart > 60 then
-                                                                            self:ClearTweenQueue()
-                                                                            break
-                                                                        end
-                                                                        wait(0.1)
-                                                                    end
-                                                                end
-                                                            else
-                                                                print("No hub for field, tweening to spawn")
-                                                                self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
-                                                                local tweenStart = os.clock()
-                                                                while self.processingTween and self.autoFarmEnabled do
-                                                                    if checkAndHandleDeath() then break end
-                                                                    if os.clock() - tweenStart > 60 then
-                                                                        self:ClearTweenQueue()
-                                                                        break
-                                                                    end
-                                                                    wait(0.1)
-                                                                end
-                                                            end
-                                                        else
-                                                            self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
-                                                            local tweenStart = os.clock()
-                                                            while self.processingTween and self.autoFarmEnabled do
-                                                                if checkAndHandleDeath() then break end
-                                                                if os.clock() - tweenStart > 60 then
-                                                                    self:ClearTweenQueue()
-                                                                    break
-                                                                end
-                                                                wait(0.1)
-                                                            end
-                                                        end
-                                                        WalkTo(hivePos)
-                                                        local walkStartTime = os.clock()
-                                                        while IsWalking() and self.autoFarmEnabled do
-                                                            if os.clock() - walkStartTime > 30 then
-                                                                print("Walk to hive timeout")
-                                                                StopWalking()
-                                                                break
-                                                            end
-                                                            
-                                                            hrp = character:FindFirstChild("HumanoidRootPart")
-                                                            if hrp then
-                                                                local currentPos = hrp.Position
-                                                                local dx = hivePos.X - currentPos.X
-                                                                local dy = hivePos.Y - currentPos.Y
-                                                                local dz = hivePos.Z - currentPos.Z
-                                                                local distanceToHive = math.sqrt(dx * dx + dy * dy + dz * dz)
-                                                                
-                                                                if distanceToHive < 1 then
-                                                                    StopWalking()
-                                                                    break
-                                                                end
-                                                            end
-                                                            
-                                                            wait(0.1)
-                                                        end
-
-                                                        StopWalking()
-                                                        wait(2)
-                                                
-                                                while not isrbxactive() and self.autoFarmEnabled do
-                                                    warn("Roblox Is Not Active")
-                                                    self.status = "Waiting for Roblox window"
-                                                    self.needsRedraw = true
-                                                    wait(0.5)
-                                                end
-                                                
-                                                if self.autoFarmEnabled then
-                                                    hrp = character:FindFirstChild("HumanoidRootPart")
-                                                    if not hrp then
-                                                        print("ERROR: No HRP for conversion check")
-                                                        returningToHive = false
-                                                        fullPollenTime = nil
-                                                    else
-                                                        local currentPos = hrp.Position
-                                                        local dx = hivePos.X - currentPos.X
-                                                        local dy = hivePos.Y - currentPos.Y
-                                                        local dz = hivePos.Z - currentPos.Z
-                                                        local distanceToHive = math.sqrt(dx * dx + dy * dy + dz * dz)
-                                                        if distanceToHive > 5 then
-                                                            self.status = "Returning to Hive"
-                                                            self.needsRedraw = true
-                                                            WalkTo(hivePos)
-                                                            local walkStartTime = os.clock()
-                                                            local walkSuccess = false
-                                                            while IsWalking() and self.autoFarmEnabled do
-                                                                if os.clock() - walkStartTime > 5 then
-                                                                    StopWalking()
-                                                                    break
-                                                                end
-                                                                
-                                                                hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                if hrp then
-                                                                    local cPos = hrp.Position
-                                                                    local cdx = hivePos.X - cPos.X
-                                                                    local cdy = hivePos.Y - cPos.Y
-                                                                    local cdz = hivePos.Z - cPos.Z
-                                                                    local cDist = math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz)
-                                                                    
-                                                                    if cDist < 3 then
-                                                                        StopWalking()
-                                                                        walkSuccess = true
-                                                                        break
-                                                                    end
-                                                                end
-                                                                
-                                                                wait(0.1)
-                                                            end
-                                                            StopWalking()
-                                                            if not walkSuccess then
-                                                                self:QueueTween(hrp, hivePos, true)
-                                                                local tweenStartTime = os.clock()
-                                                                while self.processingTween and self.autoFarmEnabled do
-                                                                    if os.clock() - tweenStartTime > 60 then
-                                                                        print("ERROR: Tween timeout!")
-                                                                        self:ClearTweenQueue()
-                                                                        returningToHive = false
-                                                                        fullPollenTime = nil
-                                                                        break
-                                                                    end
-                                                                    wait(0.1)
-                                                                end
-                                                                
-                                                                if self.processingTween then
-                                                                    wait(1)
-                                                                end
-                                                            end
-                                                            wait(0.5)
-                                                        end
-                                                        hrp = character:FindFirstChild("HumanoidRootPart")
-                                                        if hrp then
-                                                            currentPos = hrp.Position
-                                                            dx = hivePos.X - currentPos.X
-                                                            dy = hivePos.Y - currentPos.Y
-                                                            dz = hivePos.Z - currentPos.Z
-                                                            distanceToHive = math.sqrt(dx * dx + dy * dy + dz * dz)
-                                                            
-                                                            if distanceToHive > 5 then
-                                                                warn("ERROR: Still not at hive after return attempts (" .. string.format("%.1f", distanceToHive) .. " studs)")
-                                                                warn("Skipping conversion and resuming farming")
-                                                                returningToHive = false
-                                                                fullPollenTime = nil
-                                                            else
-                                                                self.status = "Converting Pollen"
-                                                                self.needsRedraw = true
-                                                                wait(0.3)
-                                                                
-                                                                keypress(0x45)
-                                                                wait(0.1)
-                                                                keyrelease(0x45)
-                                                            end
-                                                        end
-                                                    end
-                                                    
-                                                    local balloonFound = false
-                                                    if self.convertBalloon then
-                                                        local balloons = game.Workspace:FindFirstChild("Balloons")
-                                                        if balloons then
-                                                            local hiveBalloons = balloons:FindFirstChild("HiveBalloons")
-                                                            if hiveBalloons then
-                                                                for _, balloonInstance in pairs(hiveBalloons:GetChildren()) do
-                                                                    if balloonInstance.Name == "HiveBalloonInstance" then
-                                                                        local balloonBody = balloonInstance:FindFirstChild("BalloonBody")
-                                                                        if balloonBody and balloonBody:IsA("BasePart") then
-                                                                            local balloonPos = balloonBody.Position
-                                                                            local hrpPos = hrp.Position
-                                                                            
-                                                                            local dx = balloonPos.X - hrpPos.X
-                                                                            local dy = balloonPos.Y - hrpPos.Y
-                                                                            local dz = balloonPos.Z - hrpPos.Z
-                                                                            local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-                                                                            
-                                                                            print("DEBUG BALLOON: Balloon distance: " .. string.format("%.1f", distance) .. " studs")
-                                                                            
-                                                                            if distance <= 25 then
-                                                                                print("www Hive balloon found within 25 studs! Using text checker...")
-                                                                                balloonFound = true
-                                                                                self.status = "Converting Balloon"
-                                                                                self.needsRedraw = true
-                                                                                
-																				-- NEW: Text-based conversion checker
-																				local conversionAttempts = 0
-																				local lastAttemptTime = os.clock()
-																				
-																				while self.autoFarmEnabled do
-																				    -- Check conversion status text
-																				    local conversionStatus = "unknown"
-																				    pcall(function()
-																				        local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
-																				        if activateButton then
-																				            conversionStatus = activateButton.Text
-																				        end
-																				    end)
-																				    
-																				    print("DEBUG BALLOON: Conversion status: '" .. conversionStatus .. "'")
-																				    
-																				    -- If conversion is done (no pollen left)
-																				    if conversionStatus == "To Make Honey, Collect Pollen From Flower Fields" then
-																				        print("w Balloon conversion complete (no pollen)")
-																				        break
-																				    end
-																				    
-																				    -- If still converting
-																				    if conversionStatus == "Stop Making Honey" then
-																				        print("DEBUG BALLOON: Still converting...")
-																				        conversionAttempts = 0  -- Reset counter when converting successfully
-																				        
-																				        -- Check if player moved away from hive
-																				        hrp = character:FindFirstChild("HumanoidRootPart")
-																				        if hrp then
-																				            local cPos = hrp.Position
-																				            local cdx = hivePos.X - cPos.X
-																				            local cdy = hivePos.Y - cPos.Y
-																				            local cdz = hivePos.Z - cPos.Z
-																				            local cDist = math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz)
-																				            
-																				            if cDist > 3 then
-																				                print("k Player moved away from hive during balloon conversion (" .. string.format("%.1f", cDist) .. " studs)!")
-																				                print("Attempting to return to hive...")
-																				                
-																				                WalkTo(hivePos)
-																				                local walkStart = os.clock()
-																				                
-																				                while IsWalking() and self.autoFarmEnabled do
-																				                    if os.clock() - walkStart > 10 then
-																				                        StopWalking()
-																				                        print("Walk timeout, using tween...")
-																				                        self:QueueTween(hrp, hivePos, true)
-																				                        
-																				                        while self.processingTween and self.autoFarmEnabled do
-																				                            wait(0.1)
-																				                        end
-																				                        break
-																				                    end
-																				                    
-																				                    hrp = character:FindFirstChild("HumanoidRootPart")
-																				                    if hrp then
-																				                        local rPos = hrp.Position
-																				                        local rdx = hivePos.X - rPos.X
-																				                        local rdy = hivePos.Y - rPos.Y
-																				                        local rdz = hivePos.Z - rPos.Z
-																				                        local rDist = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
-																				                        
-																				                        if rDist < 3 then
-																				                            StopWalking()
-																				                            break
-																				                        end
-																				                    end
-																				                    
-																				                    wait(0.1)
-																				                end
-																				                
-																				                StopWalking()
-																				                print("w Returned to hive")
-																				                
-																				                -- Wait for Roblox to be active before pressing E
-																				                while not isrbxactive() and self.autoFarmEnabled do
-																				                    warn("Roblox Is Not Active - waiting to press E")
-																				                    self.status = "Waiting for Roblox window"
-																				                    self.needsRedraw = true
-																				                    wait(0.5)
-																				                end
-																				                
-																				                if self.autoFarmEnabled then
-																				                    print("Pressing E to restart conversion...")
-																				                    keypress(0x45)
-																				                    wait(0.2)
-																				                    keyrelease(0x45)
-																				                    wait(0.5)
-																				                    print("w Conversion restarted")
-																				                end
-																				            end
-																				        end
-																				        
-																				        wait(0.5)
-																				        continue
-																				    end
-																				    
-																				    -- If ready to start conversion
-																				    if conversionStatus == "Make Honey" then
-																				        -- Check if stuck trying to start
-																				        if os.clock() - lastAttemptTime > 4 then
-																				            conversionAttempts = conversionAttempts + 1
-																				            print("k Conversion attempt #" .. conversionAttempts .. " (stuck on 'Make Honey')")
-																				            
-																				            if conversionAttempts >= 3 then
-																				                print(" X BALLOON CONVERSION FAILED - Tweening to hive and resuming auto farm")
-																				                
-																				                hrp = character:FindFirstChild("HumanoidRootPart")
-																				                if hrp then
-																				                    self:QueueTween(hrp, hivePos, true)
-																				                    while self.processingTween and self.autoFarmEnabled do
-																				                        wait(0.1)
-																				                    end
-																				                end
-																				                
-																				                self.status = "Balloon Conversion Failed"
-																				                self.needsRedraw = true
-																				                wait(2)
-																				                break  -- Exit balloon conversion loop, resume auto farm
-																				            end
-																				        end
-																				        
-																				        lastAttemptTime = os.clock()
-																				        
-																				        print("DEBUG BALLOON: Status is 'Make Honey' - pressing E to start conversion")
-																				        
-																				        while not isrbxactive() and self.autoFarmEnabled do
-																				            warn("Roblox Is Not Active - waiting to press E")
-																				            self.status = "Waiting for Roblox window"
-																				            self.needsRedraw = true
-																				            wait(0.5)
-																				        end
-																				        
-																				        if self.autoFarmEnabled then
-																				            keypress(0x45)
-																				            wait(0.2)
-																				            keyrelease(0x45)
-																				            wait(1)
-																				            print("w Pressed E to start balloon conversion")
-																				        end
-																				    end
-																				    
-																				    wait(0.5)
-																				end
-                                                                                print("w Balloon conversion loop ended")
-                                                                                break
-                                                                            end
-                                                                        end
-                                                                    end
-                                                                end
-                                                            end
-                                                        end
-                                                    end
-
-                                                    while self.autoFarmEnabled do
-                                                        -- CHECK CONVERSION STATUS FIRST
-                                                        local conversionStatus = "unknown"
-                                                        pcall(function()
-                                                            local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
-                                                            if activateButton then
-                                                                conversionStatus = activateButton.Text
-                                                            end
-                                                        end)
-                                                        
-                                                        -- If already converting, just wait
-                                                        if conversionStatus == "Stop Making Honey" then
-                                                            print("DEBUG CONVERT: Already converting, waiting...")
-                                                            wait(0.5)
-                                                            
-                                                            -- Check if done
-                                                            local currentPollen = pollen.Value
-                                                            if currentPollen <= 0 then
-                                                                wait(6)
-                                                                if self.returningFromConversion then
-                                                                    self.gatherStartTime = os.clock()
-                                                                    self.returningFromConversion = false
-                                                                end
-                                                                break
-                                                            end
-                                                            
-                                                        -- If conversion is done (no pollen left), exit
-                                                        elseif conversionStatus == "To Make Honey, Collect Pollen From Flower Fields" then
-                                                            print("DEBUG CONVERT: Conversion complete (no pollen)")
-                                                            wait(6)
-                                                            if self.returningFromConversion then
-                                                                self.gatherStartTime = os.clock()
-                                                                self.returningFromConversion = false
-                                                            end
-                                                            break
-                                                            
-                                                        -- If ready to start conversion, press E
-                                                        elseif conversionStatus == "Make Honey" then
-                                                            hrp = character:FindFirstChild("HumanoidRootPart")
-                                                            if hrp then
-                                                                local cPos = hrp.Position
-                                                                local cdx = hivePos.X - cPos.X
-                                                                local cdy = hivePos.Y - cPos.Y
-                                                                local cdz = hivePos.Z - cPos.Z
-                                                                local cDist = math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz)
-                                                                
-                                                                if cDist > 25 then
-                                                                    print("k Player moved away from hive during conversion (" .. string.format("%.1f", cDist) .. " studs)!")
-                                                                    print("Attempting to return to hive...")
-                                                                    
-                                                                    WalkTo(hivePos)
-                                                                    local walkStart = os.clock()
-                                                                    
-                                                                    while IsWalking() and self.autoFarmEnabled do
-                                                                        if os.clock() - walkStart > 5 then
-                                                                            StopWalking()
-                                                                            print("Walk timeout, using tween...")
-                                                                            self:QueueTween(hrp, hivePos, true)
-                                                                            
-                                                                            while self.processingTween and self.autoFarmEnabled do
-                                                                                wait(0.1)
-                                                                            end
-                                                                            break
-                                                                        end
-                                                                        
-                                                                        hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                        if hrp then
-                                                                            local rPos = hrp.Position
-                                                                            local rdx = hivePos.X - rPos.X
-                                                                            local rdy = hivePos.Y - rPos.Y
-                                                                            local rdz = hivePos.Z - rPos.Z
-                                                                            local rDist = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
-                                                                            
-                                                                            if rDist < 25 then
-                                                                                StopWalking()
-                                                                                wait(1)
-                                                                                break
-                                                                            end
-                                                                        end
-                                                                        
-                                                                        wait(0.1)
-                                                                    end
-                                                                    
-                                                                    StopWalking()
-                                                                    print("w Returned to hive")
-                                                                end
-                                                                
-                                                                print("DEBUG CONVERT: Status is 'Make Honey' - pressing E to start conversion")
-                                                                
-                                                                while not isrbxactive() and self.autoFarmEnabled do
-                                                                    warn("Roblox Is Not Active - waiting to press E")
-                                                                    self.status = "Waiting for Roblox window"
-                                                                    self.needsRedraw = true
-                                                                    wait(0.5)
-                                                                end
-                                                                
-                                                                if self.autoFarmEnabled then
-                                                                    keypress(0x45)
-                                                                    wait(0.2)
-                                                                    keyrelease(0x45)
-                                                                    wait(1)
-                                                                    print("w Pressed E to start conversion")
-                                                                end
-                                                            end
-                                                            
-                                                        else
-                                                            print("DEBUG CONVERT: Unknown status '" .. tostring(conversionStatus) .. "', waiting...")
-                                                            wait(0.5)
-                                                        end
-                                                        
-                                                        wait(0.5)
-                                                    end
-                                                                                    
-                                                    returningToHive = false
-                                                    fullPollenTime = nil
-                                                    self.status = "Auto Farm Active"
-                                                    self.needsRedraw = true
-
-                                                    -- ===== PATHFINDING: Return to field after conversion =====
-                                                    if self.autoFarmEnabled and self.selectedOption then
-                                                        local flowerZones = game.Workspace.FlowerZones
-                                                        if flowerZones then
-                                                            local targetZone = flowerZones:FindFirstChild(self.selectedOption)
-                                                            if targetZone then
-                                                                local fieldPos = Vector3.new(targetZone.Position.X, targetZone.Position.Y + 10, targetZone.Position.Z)
-                                                                
-                                                                -- Check if pathfinding is enabled AND field is supported
-                                                                local pathfindingSupported = self.fieldToHub[self.selectedOption] ~= nil
-
-                                                                if self.testWalkEnabled and pathfindingSupported then
-                                                                    -- Test Walk is enabled - use pathfinding
-                                                                    -- Test Walk is enabled - use pathfinding
-                                                                    print("=== TEST WALK: Hive -> " .. self.selectedOption .. " ===")
-
-                                                                    -- Build path from spawn to field using pathfinding system
-                                                                    local spawnNode = "dand_mush_w2"
-                                                                    local targetFieldHub = self.fieldToHub[self.selectedOption]
-                                                                    local testPath = nil
-
-                                                                    if targetFieldHub then
-                                                                        testPath = self:PathfindBetweenNodes(spawnNode, targetFieldHub)
-                                                                    end
-
-                                                                    if testPath and #testPath > 0 then
-                                                                        print("Walking path: " .. table.concat(testPath, " -> "))
-                                                                        local walkSuccess = self:WalkPath(testPath)
-                                                                        
-                                                                        if walkSuccess then
-                                                                            print("Walking to field center...")
-                                                                            character = player.Character
-                                                                            if character then
-                                                                                hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                                if hrp then
-                                                                                    WalkTo(fieldPos)
-                                                                                    local startTime = os.clock()
-                                                                                    while IsWalking() and self.autoFarmEnabled do
-                                                                                        character = player.Character
-                                                                                        if character then
-                                                                                            hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                                            if hrp then
-                                                                                                local currentPos = hrp.Position
-                                                                                                local dx = currentPos.X - fieldPos.X
-                                                                                                local dz = currentPos.Z - fieldPos.Z
-                                                                                                local distance2D = math.sqrt(dx * dx + dz * dz)
-                                                                                                
-                                                                                                if distance2D < 15 then
-                                                                                                    StopWalking()
-                                                                                                    break
-                                                                                                end
-                                                                                            end
-                                                                                        end
-                                                                                        
-                                                                                        if os.clock() - startTime > 10 then
-                                                                                            StopWalking()
-                                                                                            break
-                                                                                        end
-                                                                                        wait(0.1)
-                                                                                    end
-                                                                                    StopWalking()
-                                                                                end
-                                                                            end
-                                                                        else
-                                                                            print("Test Walk failed, using tween")
-                                                                            character = player.Character
-                                                                            if character then
-                                                                                hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                                if hrp then
-                                                                                    self:QueueTween(hrp, fieldPos, true)
-                                                                                    while self.processingTween and self.autoFarmEnabled do
-                                                                                        wait(0.1)
-                                                                                    end
-                                                                                end
-                                                                            end
-                                                                        end
-                                                                    else
-                                                                        -- No test path for this field, use tween
-                                                                        print("No path defined for " .. self.selectedOption .. ", using tween")
-                                                                        character = player.Character
-                                                                        if character then
-                                                                            hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                            if hrp then
-                                                                                self:QueueTween(hrp, fieldPos, true)
-                                                                                while self.processingTween and self.autoFarmEnabled do
-                                                                                    wait(0.1)
-                                                                                end
-                                                                            end
-                                                                        end
-                                                                    end
-                                                                else
-                                                                    -- Test Walk disabled or unsupported field - tween
-                                                                    print("Pathfinding disabled or unsupported field, tweening back")
-                                                                    character = player.Character
-                                                                    if character then
-                                                                        hrp = character:FindFirstChild("HumanoidRootPart")
-                                                                        if hrp then
-                                                                            self:QueueTween(hrp, fieldPos, true)
-                                                                            while self.processingTween and self.autoFarmEnabled do
-                                                                                wait(0.1)
-                                                                            end
-                                                                        end
-                                                                    end
-                                                                end
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            else
-                                                wait(0.1)
-                                            end
-                                        else
-                                            returningToHive = false
-                                            fullPollenTime = nil
-                                        end
-                                    else
-                                        returningToHive = false
-                                        fullPollenTime = nil
-                                    end
-                                end
-                            end
-                        else
-                            if fullPollenTime then
-                                fullPollenTime = nil
-                            end
-                            if returningToHive then
-                                returningToHive = false
-                            end
-                        end
-                    end
-                end
-                
-                -- Skip field logic if returning to hive
-                if returningToHive then
-                    wait(1)
-                    return
-                end
-                
-                                                -- Check for Windy Bee (copied from Vicious Bee logic)
-                        -- Check for Windy Bee (copied from Vicious Bee logic)
+	            local success, err = pcall(function()
+	                local player = game.Players.LocalPlayer
+	                local character = player.Character
+	                
+	                if not character then
+	                    print("No character, waiting...")
+	                    wait(1)
+	                    return
+	                end
+	                
+	                local hrp = character:FindFirstChild("HumanoidRootPart")
+	                if not hrp then
+	                    print("No HRP, waiting...")
+	                    wait(1)
+	                    return
+	                end
+	                
+	                local coreStats = player:FindFirstChild("CoreStats")
+	                local gatherTimeSeconds = self.gatherTime * 60
+	                local timeElapsed = os.clock() - (self.gatherStartTime or os.clock())
+	                local gatherTimeFull = timeElapsed >= gatherTimeSeconds
+	                if not self.lastTimerDebug or os.clock() - self.lastTimerDebug >= 10 then
+	                    self.lastTimerDebug = os.clock()
+	                end
+	                if coreStats then
+	                    local pollen = coreStats:FindFirstChild("Pollen")
+	                    local capacity = coreStats:FindFirstChild("Capacity")
+	                    if pollen and capacity then
+	                        local pollenValue = pollen.Value
+	                        local capacityValue = capacity.Value 
+	                        if pollenValue >= capacityValue or gatherTimeFull then
+	                            if not fullPollenTime then
+	                                fullPollenTime = os.clock() - 2
+	                            else
+	                                local elapsed = os.clock() - fullPollenTime
+	                            end
+	                            
+	                            if fullPollenTime and os.clock() - fullPollenTime >= 2 and not returningToHive then
+	                                    returningToHive = true
+	                                    self.returningFromConversion = true
+	                                    
+	                                    if self.useInstantConverter and self.autoFarmEnabled then
+	                                        local currentTime = os.clock()
+	                                        
+	                                        if not self.lastInstantConverter1Time then self.lastInstantConverter1Time = currentTime - 900 end
+	                                        if not self.lastInstantConverter2Time then self.lastInstantConverter2Time = currentTime - 900 end
+	                                        if not self.lastInstantConverter3Time then self.lastInstantConverter3Time = currentTime - 900 end
+	                                        
+	                                        local closestConverter = nil
+	                                        local closestDistance = math.huge
+	                                        local converterKey = nil
+	                                        
+	                                        if currentTime - self.lastInstantConverter1Time >= 900 then
+	                                            local dx = hrp.Position.X - (-147)
+	                                            local dz = hrp.Position.Z - 193
+	                                            local distance = math.sqrt(dx * dx + dz * dz)
+	                                            if distance < closestDistance then
+	                                                closestDistance = distance
+	                                                closestConverter = "IC1"
+	                                                converterKey = "instantConverter1"
+	                                            end
+	                                        end
+	                                        
+	                                        if currentTime - self.lastInstantConverter2Time >= 900 then
+	                                            local dx = hrp.Position.X - 282
+	                                            local dz = hrp.Position.Z - (-63)
+	                                            local distance = math.sqrt(dx * dx + dz * dz)
+	                                            if distance < closestDistance then
+	                                                closestDistance = distance
+	                                                closestConverter = "IC2"
+	                                                converterKey = "instantConverter2"
+	                                            end
+	                                        end
+	                                        
+	                                        if currentTime - self.lastInstantConverter3Time >= 900 then
+	                                            local dx = hrp.Position.X - 143
+	                                            local dz = hrp.Position.Z - (-222)
+	                                            local distance = math.sqrt(dx * dx + dz * dz)
+	                                            if distance < closestDistance then
+	                                                closestDistance = distance
+	                                                closestConverter = "IC3"
+	                                                converterKey = "instantConverter3"
+	                                            end
+	                                        end
+	                                        
+	                                        if converterKey then
+	                                            print(closestConverter .. " AVAILABLE")
+	                                            
+	                                            -- Use the dispenser collection function
+	                                            self:CollectDispenser(converterKey)
+	                                            
+	                                            if closestConverter == "IC1" then
+	                                                self.lastInstantConverter1Time = currentTime
+	                                            elseif closestConverter == "IC2" then
+	                                                self.lastInstantConverter2Time = currentTime
+	                                            elseif closestConverter == "IC3" then
+	                                                self.lastInstantConverter3Time = currentTime
+	                                            end
+	                                            
+	                                            returningToHive = false
+	                                            fullPollenTime = nil
+	                                            self.gatherStartTime = os.clock()
+	                                            self.status = "Auto Farm Active"
+	                                            
+	                                            wait(1)
+	                                            return
+	                                        end
+	                                    end
+	                                    
+	                                    if self.resetWhenFull then
+	                                        self.status = "Resetting (Full)"
+	                                        self.needsRedraw = true
+	                                        
+	                                        StopWalking()
+	                                        self:ClearTweenQueue()
+	                                        ResetPlayer()
+	                                        local respawned = WaitForRespawn(30)
+	                                        
+	                                        if respawned then
+	                                            self.status = "Waiting for bees..."
+	                                            self.needsRedraw = true
+	                                            wait(15)
+	                                            returningToHive = false
+	                                            fullPollenTime = nil
+	                                            self.sprinklersPlaced = false
+	                                            self.status = "Auto Farm Active"
+	                                            self.needsRedraw = true
+	                                            
+	                                            local player = game.Players.LocalPlayer
+	                                            local character = player.Character
+	                                            if character then
+	                                                local hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                if hrp then
+	                                                    local flowerZones = game.Workspace.FlowerZones
+	                                                    if flowerZones and self.selectedOption then
+	                                                        local targetZone = flowerZones:FindFirstChild(self.selectedOption)
+	                                                        if targetZone then
+	                                                            local targetPos = Vector3.new(targetZone.Position.X, targetZone.Position.Y + 10, targetZone.Position.Z)
+	                                                            self:QueueTween(hrp, targetPos, true)
+	                                                            wait(1)
+	                                                        end
+	                                                    end
+	                                                end
+	                                            end
+	                                        else
+	                                            print("ERROR: Failed to respawn, stopping auto farm")
+	                                            self:StopAutoFarm()
+	                                            return
+	                                        end
+	                                    else
+	                                        self.status = "Going to Hive"
+	                                        self.needsRedraw = true
+	
+	                                        StopWalking()
+	                                        self:ClearTweenQueue()
+	                                            local hivePlatforms = game.Workspace:FindFirstChild("HivePlatforms")
+	
+	                                            if hivePlatforms then
+	                                                local playerHive = nil
+	                                                
+	                                                for _, platform in pairs(hivePlatforms:GetChildren()) do
+	                                                    local playerRef = platform:FindFirstChild("PlayerRef")
+	                                                    if playerRef and playerRef.Value then
+	                                                        local refPlayer = playerRef.Value
+	                                                        
+	                                                        if refPlayer.Name == player.Name then
+	                                                            playerHive = platform
+	                                                            break
+	                                                        end
+	                                                    end
+	                                                end
+	                                                
+	                                                if playerHive then
+	                                                    local hivePart = playerHive:FindFirstChild("Platform") or playerHive:FindFirstChildWhichIsA("BasePart")
+	                                                    
+	                                                    if hivePart then
+	                                                        local hivePos = Vector3.new(hivePart.Position.X, hivePart.Position.Y + 5, hivePart.Position.Z)
+	                                                        
+	                                                        if self.testWalkEnabled and self.selectedOption and self.selectedOption ~= "Select Field..." then
+	                                                            local currentFieldHub = self.fieldToHub[self.selectedOption]
+	                                                            if currentFieldHub then
+	                                                                local pathToSpawn = self:PathfindBetweenNodes(currentFieldHub, "dand_mush_w2")
+	                                                                if pathToSpawn then
+	                                                                    local walkSuccess = self:WalkPath(pathToSpawn)
+	                                                                    
+	                                                                    if walkSuccess then
+	                                                                        print("at spawn")
+	                                                                    else
+	                                                                        print("Pathfind failed, tweening to spawn")
+	                                                                        self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
+	                                                                        local tweenStart = os.clock()
+	                                                                        while self.processingTween and self.autoFarmEnabled do
+	                                                                            if checkAndHandleDeath() then break end
+	                                                                            if os.clock() - tweenStart > 60 then
+	                                                                                self:ClearTweenQueue()
+	                                                                                break
+	                                                                            end
+	                                                                            wait(0.1)
+	                                                                        end
+	                                                                    end
+	                                                                else
+	                                                                    print("No path to spawn tweening")
+	                                                                    self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
+	                                                                    local tweenStart = os.clock()
+	                                                                    while self.processingTween and self.autoFarmEnabled do
+	                                                                        if checkAndHandleDeath() then break end
+	                                                                        if os.clock() - tweenStart > 60 then
+	                                                                            self:ClearTweenQueue()
+	                                                                            break
+	                                                                        end
+	                                                                        wait(0.1)
+	                                                                    end
+	                                                                end
+	                                                            else
+	                                                                print("No hub for field, tweening to spawn")
+	                                                                self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
+	                                                                local tweenStart = os.clock()
+	                                                                while self.processingTween and self.autoFarmEnabled do
+	                                                                    if checkAndHandleDeath() then break end
+	                                                                    if os.clock() - tweenStart > 60 then
+	                                                                        self:ClearTweenQueue()
+	                                                                        break
+	                                                                    end
+	                                                                    wait(0.1)
+	                                                                end
+	                                                            end
+	                                                        else
+	                                                            self:QueueTween(hrp, Vector3.new(-114, 15, 272), true)
+	                                                            local tweenStart = os.clock()
+	                                                            while self.processingTween and self.autoFarmEnabled do
+	                                                                if checkAndHandleDeath() then break end
+	                                                                if os.clock() - tweenStart > 60 then
+	                                                                    self:ClearTweenQueue()
+	                                                                    break
+	                                                                end
+	                                                                wait(0.1)
+	                                                            end
+	                                                        end
+	                                                        WalkTo(hivePos)
+	                                                        local walkStartTime = os.clock()
+	                                                        while IsWalking() and self.autoFarmEnabled do
+	                                                            if os.clock() - walkStartTime > 30 then
+	                                                                print("Walk to hive timeout")
+	                                                                StopWalking()
+	                                                                break
+	                                                            end
+	                                                            
+	                                                            hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                            if hrp then
+	                                                                local currentPos = hrp.Position
+	                                                                local dx = hivePos.X - currentPos.X
+	                                                                local dy = hivePos.Y - currentPos.Y
+	                                                                local dz = hivePos.Z - currentPos.Z
+	                                                                local distanceToHive = math.sqrt(dx * dx + dy * dy + dz * dz)
+	                                                                
+	                                                                if distanceToHive < 1 then
+	                                                                    StopWalking()
+	                                                                    break
+	                                                                end
+	                                                            end
+	                                                            
+	                                                            wait(0.1)
+	                                                        end
+	
+	                                                        StopWalking()
+	                                                        wait(2)
+	                                                
+	                                                while not isrbxactive() and self.autoFarmEnabled do
+	                                                    warn("Roblox Is Not Active")
+	                                                    self.status = "Waiting for Roblox window"
+	                                                    self.needsRedraw = true
+	                                                    wait(0.5)
+	                                                end
+	                                                
+	                                                if self.autoFarmEnabled then
+	                                                    hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                    if not hrp then
+	                                                        print("ERROR: No HRP for conversion check")
+	                                                        returningToHive = false
+	                                                        fullPollenTime = nil
+	                                                    else
+	                                                        local currentPos = hrp.Position
+	                                                        local dx = hivePos.X - currentPos.X
+	                                                        local dy = hivePos.Y - currentPos.Y
+	                                                        local dz = hivePos.Z - currentPos.Z
+	                                                        local distanceToHive = math.sqrt(dx * dx + dy * dy + dz * dz)
+	                                                        if distanceToHive > 5 then
+	                                                            self.status = "Returning to Hive"
+	                                                            self.needsRedraw = true
+	                                                            WalkTo(hivePos)
+	                                                            local walkStartTime = os.clock()
+	                                                            local walkSuccess = false
+	                                                            while IsWalking() and self.autoFarmEnabled do
+	                                                                if os.clock() - walkStartTime > 5 then
+	                                                                    StopWalking()
+	                                                                    break
+	                                                                end
+	                                                                
+	                                                                hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                if hrp then
+	                                                                    local cPos = hrp.Position
+	                                                                    local cdx = hivePos.X - cPos.X
+	                                                                    local cdy = hivePos.Y - cPos.Y
+	                                                                    local cdz = hivePos.Z - cPos.Z
+	                                                                    local cDist = math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz)
+	                                                                    
+	                                                                    if cDist < 3 then
+	                                                                        StopWalking()
+	                                                                        walkSuccess = true
+	                                                                        break
+	                                                                    end
+	                                                                end
+	                                                                
+	                                                                wait(0.1)
+	                                                            end
+	                                                            StopWalking()
+	                                                            if not walkSuccess then
+	                                                                self:QueueTween(hrp, hivePos, true)
+	                                                                local tweenStartTime = os.clock()
+	                                                                while self.processingTween and self.autoFarmEnabled do
+	                                                                    if os.clock() - tweenStartTime > 60 then
+	                                                                        print("ERROR: Tween timeout!")
+	                                                                        self:ClearTweenQueue()
+	                                                                        returningToHive = false
+	                                                                        fullPollenTime = nil
+	                                                                        break
+	                                                                    end
+	                                                                    wait(0.1)
+	                                                                end
+	                                                                
+	                                                                if self.processingTween then
+	                                                                    wait(1)
+	                                                                end
+	                                                            end
+	                                                            wait(0.5)
+	                                                        end
+	                                                        hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                        if hrp then
+	                                                            currentPos = hrp.Position
+	                                                            dx = hivePos.X - currentPos.X
+	                                                            dy = hivePos.Y - currentPos.Y
+	                                                            dz = hivePos.Z - currentPos.Z
+	                                                            distanceToHive = math.sqrt(dx * dx + dy * dy + dz * dz)
+	                                                            
+	                                                            if distanceToHive > 5 then
+	                                                                warn("ERROR: Still not at hive after return attempts (" .. string.format("%.1f", distanceToHive) .. " studs)")
+	                                                                warn("Skipping conversion and resuming farming")
+	                                                                returningToHive = false
+	                                                                fullPollenTime = nil
+	                                                            else
+	                                                                self.status = "Converting Pollen"
+	                                                                self.needsRedraw = true
+	                                                                wait(0.3)
+	                                                                
+	                                                                keypress(0x45)
+	                                                                wait(0.1)
+	                                                                keyrelease(0x45)
+	                                                            end
+	                                                        end
+	                                                    end
+	                                                    
+	                                                    local balloonFound = false
+	                                                    if self.convertBalloon then
+	                                                        local balloons = game.Workspace:FindFirstChild("Balloons")
+	                                                        if balloons then
+	                                                            local hiveBalloons = balloons:FindFirstChild("HiveBalloons")
+	                                                            if hiveBalloons then
+	                                                                for _, balloonInstance in pairs(hiveBalloons:GetChildren()) do
+	                                                                    if balloonInstance.Name == "HiveBalloonInstance" then
+	                                                                        local balloonBody = balloonInstance:FindFirstChild("BalloonBody")
+	                                                                        if balloonBody and balloonBody:IsA("BasePart") then
+	                                                                            local balloonPos = balloonBody.Position
+	                                                                            local hrpPos = hrp.Position
+	                                                                            
+	                                                                            local dx = balloonPos.X - hrpPos.X
+	                                                                            local dy = balloonPos.Y - hrpPos.Y
+	                                                                            local dz = balloonPos.Z - hrpPos.Z
+	                                                                            local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+	                                                                            
+	                                                                            print("DEBUG BALLOON: Balloon distance: " .. string.format("%.1f", distance) .. " studs")
+	                                                                            
+	                                                                            if distance <= 25 then
+	                                                                                print("www Hive balloon found within 25 studs! Using text checker...")
+	                                                                                balloonFound = true
+	                                                                                self.status = "Converting Balloon"
+	                                                                                self.needsRedraw = true
+	                                                                                
+																					local conversionAttempts = 0
+																					local lastAttemptTime = os.clock()
+																					
+																					while self.autoFarmEnabled do
+																					    -- Check conversion status text
+																					    local conversionStatus = "unknown"
+																					    pcall(function()
+																					        local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
+																					        if activateButton then
+																					            conversionStatus = activateButton.Text
+																					        end
+																					    end)
+																					    
+																					    print("DEBUG BALLOON: Conversion status: '" .. conversionStatus .. "'")
+																					    
+																					    if conversionStatus == "To Make Honey, Collect Pollen From Flower Fields" then
+																					        print("w Balloon conversion complete (no pollen)")
+																					        break
+																					    end
+																					    
+																					    if conversionStatus == "Stop Making Honey" then
+																					        print("DEBUG BALLOON: Still converting...")
+																					        conversionAttempts = 0
+																					        
+																					        -- Check if player moved away from hive
+																					        hrp = character:FindFirstChild("HumanoidRootPart")
+																					        if hrp then
+																					            local cPos = hrp.Position
+																					            local cdx = hivePos.X - cPos.X
+																					            local cdy = hivePos.Y - cPos.Y
+																					            local cdz = hivePos.Z - cPos.Z
+																					            local cDist = math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz)
+																					            
+																					            if cDist > 3 then
+																					                print("k Player moved away from hive during balloon conversion (" .. string.format("%.1f", cDist) .. " studs)!")
+																					                print("Attempting to return to hive...")
+																					                
+																					                WalkTo(hivePos)
+																					                local walkStart = os.clock()
+																					                
+																					                while IsWalking() and self.autoFarmEnabled do
+																					                    if os.clock() - walkStart > 10 then
+																					                        StopWalking()
+																					                        print("Walk timeout, using tween...")
+																					                        self:QueueTween(hrp, hivePos, true)
+																					                        
+																					                        while self.processingTween and self.autoFarmEnabled do
+																					                            wait(0.1)
+																					                        end
+																					                        break
+																					                    end
+																					                    
+																					                    hrp = character:FindFirstChild("HumanoidRootPart")
+																					                    if hrp then
+																					                        local rPos = hrp.Position
+																					                        local rdx = hivePos.X - rPos.X
+																					                        local rdy = hivePos.Y - rPos.Y
+																					                        local rdz = hivePos.Z - rPos.Z
+																					                        local rDist = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
+																					                        
+																					                        if rDist < 3 then
+																					                            StopWalking()
+																					                            break
+																					                        end
+																					                    end
+																					                    
+																					                    wait(0.1)
+																					                end
+																					                
+																					                StopWalking()
+																					                print("w Returned to hive")
+																					                
+																					                while not isrbxactive() and self.autoFarmEnabled do
+																					                    warn("Roblox Is Not Active - waiting to press E")
+																					                    self.status = "Waiting for Roblox window"
+																					                    self.needsRedraw = true
+																					                    wait(0.5)
+																					                end
+																					                
+																					                if self.autoFarmEnabled then
+																					                    print("Pressing E to restart conversion...")
+																					                    keypress(0x45)
+																					                    wait(0.2)
+																					                    keyrelease(0x45)
+																					                    wait(0.5)
+																					                    print("w Conversion restarted")
+																					                end
+																					            end
+																					        end
+																					        
+																					        wait(0.5)
+																					        continue
+																					    end
+																					    
+																					    -- If ready to start conversion
+																					    if conversionStatus == "Make Honey" then
+																					        if os.clock() - lastAttemptTime > 4 then
+																					            conversionAttempts = conversionAttempts + 1
+																					            print("k Conversion attempt #" .. conversionAttempts .. " (stuck on 'Make Honey')")
+																					            
+																					            if conversionAttempts >= 3 then
+																					                print(" X BALLOON CONVERSION FAILED - Tweening to hive and resuming auto farm")
+																					                
+																					                hrp = character:FindFirstChild("HumanoidRootPart")
+																					                if hrp then
+																					                    self:QueueTween(hrp, hivePos, true)
+																					                    while self.processingTween and self.autoFarmEnabled do
+																					                        wait(0.1)
+																					                    end
+																					                end
+																					                
+																					                self.status = "Balloon Conversion Failed"
+																					                self.needsRedraw = true
+																					                wait(2)
+																					                break
+																					            end
+																					        end
+																					        
+																					        lastAttemptTime = os.clock()
+																					        
+																					        print("DEBUG BALLOON: Status is 'Make Honey' - pressing E to start conversion")
+																					        
+																					        while not isrbxactive() and self.autoFarmEnabled do
+																					            warn("Roblox Is Not Active - waiting to press E")
+																					            self.status = "Waiting for Roblox window"
+																					            self.needsRedraw = true
+																					            wait(0.5)
+																					        end
+																					        
+																					        if self.autoFarmEnabled then
+																					            keypress(0x45)
+																					            wait(0.2)
+																					            keyrelease(0x45)
+																					            wait(1)
+																					            print("w Pressed E to start balloon conversion")
+																					        end
+																					    end
+																					    
+																					    wait(0.5)
+																					end
+	                                                                                print("w Balloon conversion loop ended")
+	                                                                                break
+	                                                                            end
+	                                                                        end
+	                                                                    end
+	                                                                end
+	                                                            end
+	                                                        end
+	                                                    end
+	
+	                                                    while self.autoFarmEnabled do
+	                                                        -- CHECK CONVERSION STATUS FIRST
+	                                                        local conversionStatus = "unknown"
+	                                                        pcall(function()
+	                                                            local activateButton = player.PlayerGui.ScreenGui.ActivateButton.TextBox
+	                                                            if activateButton then
+	                                                                conversionStatus = activateButton.Text
+	                                                            end
+	                                                        end)
+	                                                        
+	                                                        if conversionStatus == "Stop Making Honey" then
+	                                                            print("DEBUG CONVERT: Already converting, waiting")
+	                                                            wait(0.5)
+	                                                            
+	                                                            -- Check if done
+	                                                            local currentPollen = pollen.Value
+	                                                            if currentPollen <= 0 then
+	                                                                wait(6)
+	                                                                if self.returningFromConversion then
+	                                                                    self.gatherStartTime = os.clock()
+	                                                                    self.returningFromConversion = false
+	                                                                end
+	                                                                break
+	                                                            end
+	                                                            
+	                                                        elseif conversionStatus == "To Make Honey, Collect Pollen From Flower Fields" then
+	                                                            print("DEBUG CONVERT: Conversion complete (no pollen)")
+	                                                            wait(6)
+	                                                            if self.returningFromConversion then
+	                                                                self.gatherStartTime = os.clock()
+	                                                                self.returningFromConversion = false
+	                                                            end
+	                                                            break
+	                                                        elseif conversionStatus == "Make Honey" then
+	                                                            hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                            if hrp then
+	                                                                local cPos = hrp.Position
+	                                                                local cdx = hivePos.X - cPos.X
+	                                                                local cdy = hivePos.Y - cPos.Y
+	                                                                local cdz = hivePos.Z - cPos.Z
+	                                                                local cDist = math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz)
+	                                                                
+	                                                                if cDist > 25 then
+	                                                                    print("k Player moved away from hive during conversion (" .. string.format("%.1f", cDist) .. " studs)!")
+	                                                                    print("Attempting to return to hive...")
+	                                                                    
+	                                                                    WalkTo(hivePos)
+	                                                                    local walkStart = os.clock()
+	                                                                    
+	                                                                    while IsWalking() and self.autoFarmEnabled do
+	                                                                        if os.clock() - walkStart > 5 then
+	                                                                            StopWalking()
+	                                                                            print("Walk timeout, using tween...")
+	                                                                            self:QueueTween(hrp, hivePos, true)
+	                                                                            
+	                                                                            while self.processingTween and self.autoFarmEnabled do
+	                                                                                wait(0.1)
+	                                                                            end
+	                                                                            break
+	                                                                        end
+	                                                                        
+	                                                                        hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                        if hrp then
+	                                                                            local rPos = hrp.Position
+	                                                                            local rdx = hivePos.X - rPos.X
+	                                                                            local rdy = hivePos.Y - rPos.Y
+	                                                                            local rdz = hivePos.Z - rPos.Z
+	                                                                            local rDist = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz)
+	                                                                            
+	                                                                            if rDist < 25 then
+	                                                                                StopWalking()
+	                                                                                wait(1)
+	                                                                                break
+	                                                                            end
+	                                                                        end
+	                                                                        
+	                                                                        wait(0.1)
+	                                                                    end
+	                                                                    
+	                                                                    StopWalking()
+	                                                                    print("w Returned to hive")
+	                                                                end
+	                                                                
+	                                                                print("DEBUG CONVERT: Status is 'Make Honey' - pressing E to start conversion")
+	                                                                
+	                                                                while not isrbxactive() and self.autoFarmEnabled do
+	                                                                    warn("Roblox Is Not Active - waiting to press E")
+	                                                                    self.status = "Waiting for Roblox window"
+	                                                                    self.needsRedraw = true
+	                                                                    wait(0.5)
+	                                                                end
+	                                                                
+	                                                                if self.autoFarmEnabled then
+	                                                                    keypress(0x45)
+	                                                                    wait(0.2)
+	                                                                    keyrelease(0x45)
+	                                                                    wait(1)
+	                                                                    print("w Pressed E to start conversion")
+	                                                                end
+	                                                            end
+	                                                            
+	                                                        else
+	                                                            print("DEBUG CONVERT: Unknown status '" .. tostring(conversionStatus) .. "', waiting...")
+	                                                            wait(0.5)
+	                                                        end
+	                                                        
+	                                                        wait(0.5)
+	                                                    end
+	                                                                                    
+	                                                    returningToHive = false
+	                                                    fullPollenTime = nil
+	                                                    self.status = "Auto Farm Active"
+	                                                    self.needsRedraw = true
+	
+	                                                    if self.autoFarmEnabled and self.selectedOption then
+	                                                        local flowerZones = game.Workspace.FlowerZones
+	                                                        if flowerZones then
+	                                                            local targetZone = flowerZones:FindFirstChild(self.selectedOption)
+	                                                            if targetZone then
+	                                                                local fieldPos = Vector3.new(targetZone.Position.X, targetZone.Position.Y + 10, targetZone.Position.Z)
+	                                                                
+	                                                                -- Check if pathfinding is enabled AND field is supported
+	                                                                local pathfindingSupported = self.fieldToHub[self.selectedOption] ~= nil
+	
+	                                                                if self.testWalkEnabled and pathfindingSupported then
+	
+	                                                                    -- Build path from spawn to field using pathfinding system
+	                                                                    local spawnNode = "dand_mush_w2"
+	                                                                    local targetFieldHub = self.fieldToHub[self.selectedOption]
+	                                                                    local testPath = nil
+	
+	                                                                    if targetFieldHub then
+	                                                                        testPath = self:PathfindBetweenNodes(spawnNode, targetFieldHub)
+	                                                                    end
+	
+	                                                                    if testPath and #testPath > 0 then
+	                                                                        print("Walking path: " .. table.concat(testPath, " -> "))
+	                                                                        local walkSuccess = self:WalkPath(testPath)
+	                                                                        
+	                                                                        if walkSuccess then
+	                                                                            print("Walking to field center...")
+	                                                                            character = player.Character
+	                                                                            if character then
+	                                                                                hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                                if hrp then
+	                                                                                    WalkTo(fieldPos)
+	                                                                                    local startTime = os.clock()
+	                                                                                    while IsWalking() and self.autoFarmEnabled do
+	                                                                                        character = player.Character
+	                                                                                        if character then
+	                                                                                            hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                                            if hrp then
+	                                                                                                local currentPos = hrp.Position
+	                                                                                                local dx = currentPos.X - fieldPos.X
+	                                                                                                local dz = currentPos.Z - fieldPos.Z
+	                                                                                                local distance2D = math.sqrt(dx * dx + dz * dz)
+	                                                                                                
+	                                                                                                if distance2D < 15 then
+	                                                                                                    StopWalking()
+	                                                                                                    break
+	                                                                                                end
+	                                                                                            end
+	                                                                                        end
+	                                                                                        
+	                                                                                        if os.clock() - startTime > 10 then
+	                                                                                            StopWalking()
+	                                                                                            break
+	                                                                                        end
+	                                                                                        wait(0.1)
+	                                                                                    end
+	                                                                                    StopWalking()
+	                                                                                end
+	                                                                            end
+	                                                                        else
+	                                                                            print("Test Walk failed, using tween")
+	                                                                            character = player.Character
+	                                                                            if character then
+	                                                                                hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                                if hrp then
+	                                                                                    self:QueueTween(hrp, fieldPos, true)
+	                                                                                    while self.processingTween and self.autoFarmEnabled do
+	                                                                                        wait(0.1)
+	                                                                                    end
+	                                                                                end
+	                                                                            end
+	                                                                        end
+	                                                                    else
+	                                                                        -- No test path for this field
+	                                                                        print("No path defined for " .. self.selectedOption .. ", using tween")
+	                                                                        character = player.Character
+	                                                                        if character then
+	                                                                            hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                            if hrp then
+	                                                                                self:QueueTween(hrp, fieldPos, true)
+	                                                                                while self.processingTween and self.autoFarmEnabled do
+	                                                                                    wait(0.1)
+	                                                                                end
+	                                                                            end
+	                                                                        end
+	                                                                    end
+	                                                                else
+	                                                                    -- Test Walk disabled or unsupported field - tween
+	                                                                    print("Pathfinding disabled or unsupported field, tweening back")
+	                                                                    character = player.Character
+	                                                                    if character then
+	                                                                        hrp = character:FindFirstChild("HumanoidRootPart")
+	                                                                        if hrp then
+	                                                                            self:QueueTween(hrp, fieldPos, true)
+	                                                                            while self.processingTween and self.autoFarmEnabled do
+	                                                                                wait(0.1)
+	                                                                            end
+	                                                                        end
+	                                                                    end
+	                                                                end
+	                                                            end
+	                                                        end
+	                                                    end
+	                                                end
+	                                            else
+	                                                wait(0.1)
+	                                            end
+	                                        else
+	                                            returningToHive = false
+	                                            fullPollenTime = nil
+	                                        end
+	                                    else
+	                                        returningToHive = false
+	                                        fullPollenTime = nil
+	                                    end
+	                                end
+	                            end
+	                        else
+	                            if fullPollenTime then
+	                                fullPollenTime = nil
+	                            end
+	                            if returningToHive then
+	                                returningToHive = false
+	                            end
+	                        end
+	                    end
+	                end
+	                
+	                if returningToHive then
+	                    wait(1)
+	                    return
+	                end
                         if self.killWindy then
                             local windyBeeData = self:CheckForWindyBee()
                             
@@ -5358,7 +5340,6 @@ function UI:StartAutoFarm()
                                 local windyBeePos = windyBeeData.position
                                 
                                 if not huntingWindy then
-                                    -- Just started hunting Windy
                                     print("=== WINDY BEE DETECTED - SWITCHING TO " .. windyBeeField.Name .. " ===")
                                     
                                     if self.lastFieldChangeSource == "autofarm" or not self.lastFieldChangeSource then
