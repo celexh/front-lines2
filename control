@@ -1,4 +1,4 @@
-local serverUrl = "https://alive-server--ewassreddd.replit.app/alive"
+local serverUrl = ""
 local player = game.Players.LocalPlayer
 if not player then
     warn("LocalPlayer not found!")
